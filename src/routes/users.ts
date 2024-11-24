@@ -3,13 +3,14 @@ import { Request, Response, Router } from "express";
 import { User } from "@/models/user";
 import { z } from "zod";
 import bcrypt from "bcrypt";
+import { auth } from "@/middlewares/auth";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(User);
 
 const ZCreate = () => {
     return (req: Request, res: Response, next: any) => {
-        const schema = z.object({
+        const schema = z.strictObject({
             name: z.string().min(1).max(100),
             lastname: z.string().min(1).max(100),
             email: z.string().email(),
@@ -32,7 +33,7 @@ const ZCreate = () => {
 
 const ZUpdate = () => {
     return (req: Request, res: Response, next: any) => {
-        const schema = z.object({
+        const schema = z.strictObject({
             name: z.string().min(1).max(100),
             lastname: z.string().min(1).max(100),
             email: z.string().email(),
@@ -99,6 +100,12 @@ router.get('/:id', [ZID()], async (req: Request, res: Response) => {
 
 router.post('/', ZCreate(), async (req: Request, res: Response) => {
     try {
+        const exists = await repository.findOne({ where: { email: req.body.email } });
+        if (exists) {
+            res.status(400).json({ error: 'Email already exists' });
+            return;
+        }
+
         const { password, ...data } = req.body;
         const hash = await bcrypt.hash(password, 10);
 
@@ -112,7 +119,7 @@ router.post('/', ZCreate(), async (req: Request, res: Response) => {
     }
 });
 
-router.put('/:id', [ZID(), ZUpdate()], async (req: Request, res: Response) => {
+router.put('/:id', [auth, ZID(), ZUpdate()], async (req: Request, res: Response) => {
     try {
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
@@ -121,6 +128,7 @@ router.put('/:id', [ZID(), ZUpdate()], async (req: Request, res: Response) => {
         }
 
         // Make sure password is not updated
+        // TODO: don't allow to update email
         const { password, ...data } = req.body;
         await repository.update(user, data);
 
@@ -134,7 +142,7 @@ router.put('/:id', [ZID(), ZUpdate()], async (req: Request, res: Response) => {
     }
 });
 
-router.delete('/:id', [ZID()], async (req: Request, res: Response) => {
+router.delete('/:id', [auth, ZID()], async (req: Request, res: Response) => {
     try {
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
