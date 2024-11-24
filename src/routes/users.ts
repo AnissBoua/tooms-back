@@ -119,11 +119,16 @@ router.post('/', ZCreate(), async (req: Request, res: Response) => {
     }
 });
 
-router.put('/:id', [auth, ZID(), ZUpdate()], async (req: Request, res: Response) => {
+router.put('/:id', [auth, ZID(), ZUpdate()], async (req: any, res: Response) => {
     try {
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
             res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        if (req.user.id !== user.id) {
+            res.status(403).json({ error: 'Forbidden' });
             return;
         }
 
@@ -142,11 +147,16 @@ router.put('/:id', [auth, ZID(), ZUpdate()], async (req: Request, res: Response)
     }
 });
 
-router.delete('/:id', [auth, ZID()], async (req: Request, res: Response) => {
+router.delete('/:id', [auth, ZID()], async (req: any, res: Response) => {
     try {
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
             res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        if (req.user.id !== user.id) {
+            res.status(403).json({ error: 'Forbidden' });
             return;
         }
 

@@ -2,6 +2,7 @@ import request from "supertest";
 import app from "@/app";
 import AppDataSource from "@/config/typeorm";
 import { User } from "@/models/user";
+import { JWT } from "@/services/jwt";
 
 let server: any;
 const repository = AppDataSource.getRepository(User);
@@ -257,11 +258,13 @@ describe('/api/users', () => {
     });
 
     describe('PUT /:id', () => {
+        let token: string;
         let user: any;
         let id: number;
         const exec = async () => {
             return await request(server)
                 .put('/api/users/' + id)
+                .set('Authorization', 'Bearer ' + token)
                 .send(user);
         };
 
@@ -274,11 +277,21 @@ describe('/api/users', () => {
             
             id = usr.id;
             user = { name: 'Jane', lastname: 'Bo', email: 'jane@test.com', avatar: 'path/to/avatar.jpg' };
+            
+            token = JWT.sign(usr);
         });
 
         it('should return 400 if id is not a number', async () => {
-            const res = await request(server).put('/api/users/invalid');
+            id = -1;
+            const res = await exec();
             expect(res.status).toBe(400);
+        });
+
+        it('should return 403 if it is the wrong id', async () => {
+            id = id + 1;
+            await repository.save({ ...user, email: 'test@test.com', password: '987654321' });
+            const res = await exec();
+            expect(res.status).toBe(403);
         });
 
         it('should return 404 if the user is not found', async () => {
@@ -412,26 +425,41 @@ describe('/api/users', () => {
     });
 
     describe('DELETE /:id', ()  => {
+        let token: string;
+        let id: number;
         let user: any = { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: '' };
 
         const exec = async () => {
             return await request(server)
-                .delete('/api/users/' + user.id)
+                .delete('/api/users/' + id)
+                .set('Authorization', 'Bearer ' + token)
                 .send(user);
         };
 
         beforeEach(async () => {
             user = { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: '' };
-            user = await repository.save(user);
+            await repository.save(user);
+            id = user.id;
+            token = JWT.sign(user);
+
+            user = { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: '' };
         });
 
         it('should return 400 if id is not a number', async () => {
-            const res = await request(server).delete('/api/users/invalid');
+            id = -1;
+            const res = await exec();
             expect(res.status).toBe(400);
         });
 
+        it('should return 403 if it is the wrong id', async () => {
+            id = id + 1;
+            await repository.save({ ...user, email: 'test@test.com', password: '987654321' });
+            const res = await exec();
+            expect(res.status).toBe(403);
+        });
+
         it('should return 404 if the user is not found', async () => {
-            user = { ...user, id: 999 };
+            id = 999;
             const res = await exec();
             expect(res.status).toBe(404);
         });
