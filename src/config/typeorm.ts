@@ -1,4 +1,9 @@
+import dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
+
+// Needed for testing
+const env = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
+dotenv.config({ path: env });
 
 const AppDataSource = new DataSource({
   type: 'mysql',
@@ -7,10 +12,10 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'root',
   password: process.env.DB_PASS || '',
   database: process.env.DB_NAME || 'tooms',
-  synchronize: true,
-  logging: true,
+  synchronize: false,
+  logging: false,
   entities: ['src/models/*{.ts,.js}'],
-  migrations: ['dist/migrations/*{.ts,.js}'],
+  migrations: ['src/migrations/*{.ts,.js}'],
 });
 
 export default AppDataSource;

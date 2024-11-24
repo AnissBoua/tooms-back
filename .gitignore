@@ -1,5 +1,8 @@
 node_modules
 dist
+coverage
+jwt
 
 package-lock.json
 .env
+.env.test
