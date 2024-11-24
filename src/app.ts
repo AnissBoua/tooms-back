@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { users } from '@/routes/users';
 import { auth } from '@/routes/auth';
+import { conversations } from '@/routes/conversation';
 
 // Configure environment
 const env = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
@@ -19,7 +20,9 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Routes
-app.use('/api/users', users);
 app.use('/api/auth', auth);
+app.use('/api/users', users);
+app.use('/api/conversations', conversations);
+
 
 export default app;

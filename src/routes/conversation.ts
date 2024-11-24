@@ -2,11 +2,15 @@ import AppDataSource from "@/config/typeorm";
 import { Request, Response, Router } from "express";
 import { z } from "zod";
 import { Conversation } from "@/models/conversation";
+import { auth } from "@/middlewares/auth";
+import { User } from "@/models/user";
+import { In } from "typeorm";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(Conversation);
+const UserRepo = AppDataSource.getRepository(User);
 
-const validate = () => {
+const ZValidate = () => {
     return (req: Request, res: Response, next: any) => {
         const schema = z.object({
             users: z.array(z.number().int()),
@@ -25,26 +29,52 @@ const validate = () => {
     }
 }
 
-router.post('/', validate(), async (req: Request, res: Response) => {
+router.get('/', [auth], async (req: any, res: Response) => {
     try {
-        const conversation = await repository.save(req.body);
+        const user = await UserRepo.findOne({ where: {id: req.user.id}, relations: ['conversations.participants'] });
+        if (!user) {
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        res.json(user.conversations);
+    } catch (error) {
+        res.status(500).json({ error });
+    }
+});
+
+router.post('/', [auth, ZValidate()], async (req: Request, res: Response) => {
+    try {
+        const users = await UserRepo.findBy({ id: In(req.body.users) });
+        if (users.length !== req.body.users.length) {
+            res.status(400).json({ error: 'Some users were not found' });
+            return;
+        }
+
+        const conversation = await repository.save({ participants: users });
         res.json(conversation);
     } catch (error) {
         res.status(500).json({ error });
     }
 });
 
-router.put('/:id/add', validate(), async (req: Request, res: Response) => {
+router.put('/:id/add', [auth, ZValidate()], async (req: Request, res: Response) => {
     try {
-        const conversation = await repository.findOneBy({ id: parseInt(req.params.id) });
+        const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: ['participants'] });
         if (!conversation) {
             res.status(404).json({ error: 'Conversation not found' });
             return;
         }
 
-        const { users } = req.body;
-        conversation.participants = [...conversation.participants, ...users];
+        const users = await UserRepo.findBy({ id: In(req.body.users) });
+        if (users.length !== req.body.users.length) {
+            res.status(400).json({ error: 'Some users were not found' });
+            return;
+        }
 
+        conversation.participants = [...conversation.participants, ...users].filter((value, index, self) => {
+            return self.findIndex(user => user.id === value.id) === index;
+        });
         await repository.save(conversation);
         res.json(conversation);
     } catch (error) {
@@ -52,16 +82,16 @@ router.put('/:id/add', validate(), async (req: Request, res: Response) => {
     }
 });
 
-router.put('/:id/remove', validate(), async (req: Request, res: Response) => {
+router.put('/:id/remove', [auth, ZValidate()], async (req: Request, res: Response) => {
     try {
-        const conversation = await repository.findOneBy({ id: parseInt(req.params.id) });
+        const conversation = await repository.findOne({ where: {id: parseInt(req.params.id)}, relations: ['participants'] });
         if (!conversation) {
             res.status(404).json({ error: 'Conversation not found' });
             return;
         }
 
         const { users } = req.body;
-        conversation.participants = conversation.participants.filter((user) => !users.includes(user.id));
+        conversation.participants = conversation.participants.filter((user: User) => !users.includes(user.id));
         await repository.save(conversation);
         res.json(conversation);
     } catch (error) {
@@ -69,7 +99,7 @@ router.put('/:id/remove', validate(), async (req: Request, res: Response) => {
     }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', [auth], async (req: Request, res: Response) => {
     try {
         const conversation = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!conversation) {
@@ -77,7 +107,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
             return;
         }
 
-        await repository.delete(conversation);
+        await repository.delete({ id: conversation.id });
         res.json({ message: 'Conversation deleted' });
     } catch (error) {
         res.status(500).json({ error });
