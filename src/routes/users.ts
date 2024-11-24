@@ -10,11 +10,11 @@ const repository = AppDataSource.getRepository(User);
 const ZCreate = () => {
     return (req: Request, res: Response, next: any) => {
         const schema = z.object({
-            name: z.string().min(3).max(100),
-            lastname: z.string().min(3).max(100),
+            name: z.string().min(1).max(100),
+            lastname: z.string().min(1).max(100),
             email: z.string().email(),
             password: z.string().min(6).max(255),
-            avatar: z.string(),
+            avatar: z.string().nullable(),
         });
 
         try {
@@ -22,9 +22,9 @@ const ZCreate = () => {
             return next();
         } catch (error) {
             return res.status(400).json({
-                error: (error as z.ZodError).errors?.map((e: any) => {
+                error: (error as z.ZodError).errors.map((e: any) => {
                     return { field: e.path.join('.'), message: e.message };
-                }) || "Invalid input",
+                }),
             });
         }
     }
@@ -33,10 +33,10 @@ const ZCreate = () => {
 const ZUpdate = () => {
     return (req: Request, res: Response, next: any) => {
         const schema = z.object({
-            name: z.string().min(3).max(100),
-            lastname: z.string().min(3).max(100),
+            name: z.string().min(1).max(100),
+            lastname: z.string().min(1).max(100),
             email: z.string().email(),
-            avatar: z.string(),
+            avatar: z.string().nullable(),
         });
 
         try {
@@ -44,9 +44,28 @@ const ZUpdate = () => {
             return next();
         } catch (error) {
             return res.status(400).json({
-                error: (error as z.ZodError).errors?.map((e: any) => {
+                error: (error as z.ZodError).errors.map((e: any) => {
                     return { field: e.path.join('.'), message: e.message };
-                }) || "Invalid input",
+                }),
+            });
+        }
+    }
+}
+
+const ZID = () => {
+    return (req: Request, res: Response, next: any) => {
+        const schema = z.object({
+            id: z.string().regex(/^\d+$/, "ID must be a numeric string"),
+        });
+
+        try {
+            schema.parse(req.params);
+            return next();
+        } catch (error) {
+            return res.status(400).json({
+                error: (error as z.ZodError).errors.map((e: any) => {
+                    return { field: e.path.join('.'), message: e.message };
+                }),
             });
         }
     }
@@ -61,7 +80,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 });
 
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', [ZID()], async (req: Request, res: Response) => {
     try {
         const user = await repository.findOne({
             where: { id: parseInt(req.params.id) },
@@ -93,7 +112,7 @@ router.post('/', ZCreate(), async (req: Request, res: Response) => {
     }
 });
 
-router.put('/:id', ZUpdate(), async (req: Request, res: Response) => {
+router.put('/:id', [ZID(), ZUpdate()], async (req: Request, res: Response) => {
     try {
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
@@ -115,7 +134,7 @@ router.put('/:id', ZUpdate(), async (req: Request, res: Response) => {
     }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', [ZID()], async (req: Request, res: Response) => {
     try {
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
@@ -124,7 +143,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
         }
 
         await repository.delete(user);
-        res.json({ message: 'User deleted' });
+        res.status(204).json({ message: 'User deleted' });
     } catch (error) {
         res.status(500).json({ error });
     }
