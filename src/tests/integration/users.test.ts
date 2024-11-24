@@ -101,10 +101,23 @@ describe('/api/users', () => {
             user = { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: '' };
         });
 
+        it('should return 400 if additional parameters are sent into the request', async () => {
+            user = { ...user, hack: 'hack' };
+            const res = await exec();
+            expect(res.status).toBe(400);
+        });
+
         it('should return 500 if the repository save fail', async () => {
             jest.spyOn(repository, 'save').mockRejectedValue(new Error('Database error'));
             const res = await exec();
             expect(res.status).toBe(500);
+        });
+
+        it('should return 400 if the email is already in the database', async () => {
+            await exec();
+            const res = await exec();
+
+            expect(res.status).toBe(400);
         });
 
         it('should create a new user', async () => {
@@ -245,17 +258,22 @@ describe('/api/users', () => {
 
     describe('PUT /:id', () => {
         let user: any;
+        let id: number;
         const exec = async () => {
             return await request(server)
-                .put('/api/users/' + user.id)
+                .put('/api/users/' + id)
                 .send(user);
         };
 
         beforeEach(async () => {
             user = { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: '' };
             user = await repository.save(user);
-            user = await repository.findOne({ where: { id: user.id } });
-            user = { ...user, name: 'Jane', lastname: 'Bo', email: 'jane@test.com', avatar: 'path/to/avatar.jpg' };
+            
+            const usr = await repository.findOne({ where: { id: user.id } });
+            if (!usr) return;
+            
+            id = usr.id;
+            user = { name: 'Jane', lastname: 'Bo', email: 'jane@test.com', avatar: 'path/to/avatar.jpg' };
         });
 
         it('should return 400 if id is not a number', async () => {
@@ -264,7 +282,7 @@ describe('/api/users', () => {
         });
 
         it('should return 404 if the user is not found', async () => {
-            user = { ...user, id: 999 };
+            id = 999;
             const res = await exec();
             expect(res.status).toBe(404);
         });
@@ -273,6 +291,12 @@ describe('/api/users', () => {
             jest.spyOn(repository, 'findOneBy').mockRejectedValue(new Error('Database error'));
             const res = await exec();
             expect(res.status).toBe(500);
+        });
+
+        it('should return 400 if additional parameters are sent into the request', async () => {
+            user = { ...user, password: '987654321', hack: 'hack' };
+            const res = await exec();
+            expect(res.status).toBe(400);
         });
 
         it('should update a user', async () => {
@@ -287,27 +311,11 @@ describe('/api/users', () => {
             expect(updatedUser?.avatar).toBe('path/to/avatar.jpg');
         });
 
-        it('should update a user but not the password', async () => {
-            const password = user.password;
-            user = { ...user, password: '987654321' };
-            const res = await exec();
-            const updatedUser = await repository.findOne({ where: { id: user.id } });
-
-            expect(updatedUser).toBeTruthy();
-            expect(updatedUser?.name).toBe('Jane');
-            expect(updatedUser?.lastname).toBe('Bo');
-            expect(updatedUser?.email).toBe('jane@test.com');
-            expect(updatedUser?.password).not.toBe('987654321');
-            expect(updatedUser?.avatar).toBe('path/to/avatar.jpg');
-
-            expect(updatedUser?.password).toBe(password);
-        });
-
         it('should return the updated user', async () => {
             const res = await exec();
 
             expect(res.status).toBe(200);
-            expect(res.body).toHaveProperty('id', user.id);
+            expect(res.body).toHaveProperty('id', id);
             expect(res.body).toHaveProperty('name', 'Jane');
             expect(res.body).toHaveProperty('lastname', 'Bo');
             expect(res.body).toHaveProperty('email', 'jane@test.com');
