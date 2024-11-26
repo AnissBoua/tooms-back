@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { users } from '@/routes/users';
 import { auth } from '@/routes/auth';
 import { conversations } from '@/routes/conversation';
+import { messages } from '@/routes/message';
 
 // Configure environment
 const env = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
@@ -23,6 +24,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/auth', auth);
 app.use('/api/users', users);
 app.use('/api/conversations', conversations);
+app.use('/api/messages', messages);
 
 
 export default app;
