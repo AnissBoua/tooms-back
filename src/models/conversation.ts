@@ -7,7 +7,7 @@ export class Conversation {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToMany(() => User)
+    @ManyToMany(() => User, user => user.conversations)
     @JoinTable()
     participants: User[];
 

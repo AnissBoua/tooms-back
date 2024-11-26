@@ -135,7 +135,7 @@ router.put('/:id', [auth, ZID(), ZUpdate()], async (req: any, res: Response) => 
         // Make sure password is not updated
         // TODO: don't allow to update email
         const { password, ...data } = req.body;
-        await repository.update(user, data);
+        await repository.update({ id: user.id }, data);
 
         const updated = await repository.findOne({ 
             where: { id: parseInt(req.params.id) },
@@ -160,7 +160,7 @@ router.delete('/:id', [auth, ZID()], async (req: any, res: Response) => {
             return;
         }
 
-        await repository.delete(user);
+        await repository.delete({ id: user.id });
         res.status(204).json({ message: 'User deleted' });
     } catch (error) {
         res.status(500).json({ error });

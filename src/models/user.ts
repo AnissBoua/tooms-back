@@ -16,7 +16,7 @@ export class User {
     @Column({ unique: true, type: 'varchar', length: 255 })
     email: string;
 
-    @Column({ type: 'varchar', length: 255 })
+    @Column({ select: false, type: 'varchar', length: 255 })
     password: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
@@ -35,6 +35,6 @@ export class User {
     @OneToMany(() => Message, message => message.user)
     messages: Message[];
 
-    @ManyToMany(() => Conversation)
+    @ManyToMany(() => Conversation, conversation => conversation.participants)
     conversations: Conversation[];
 }

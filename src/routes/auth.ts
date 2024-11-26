@@ -29,22 +29,29 @@ const ZLogin = () => {
 }
 
 router.post("/login", [ZLogin()], async (req: Request, res: Response) => {
-    let user = await repository.findOne({ where: { email: req.body.email } });
-    if (!user) {
-        res.status(400).json({ error: "Invalid credentials" });
-        return;
+    try {
+        let user = await repository.findOne({ where: { email: req.body.email }, select: ['id', 'password'] });
+        if (!user) {
+            res.status(400).json({ error: "Invalid credentials" });
+            return;
+        }
+    
+        console.log(user);
+        console.log(req.body.password);
+        const valid = await bcrypt.compare(req.body.password, user.password);
+        if (!valid) {
+            res.status(400).json({ error: "Invalid credentials" });
+            return;
+        }
+    
+        const token = JWT.sign(user);
+        res.json({
+            token
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error });
     }
-
-    const valid = await bcrypt.compare(req.body.password, user.password);
-    if (!valid) {
-        res.status(400).json({ error: "Invalid credentials" });
-        return;
-    }
-
-    const token = JWT.sign(user);
-    res.json({
-        token
-    });
 });
 
 router.get("/whoami", async (req: Request, res: Response) => {

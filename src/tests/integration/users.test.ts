@@ -4,36 +4,31 @@ import AppDataSource from "@/config/typeorm";
 import { User } from "@/models/user";
 import { JWT } from "@/services/jwt";
 
-let server: any;
 const repository = AppDataSource.getRepository(User);
-beforeAll(async () => {
-    await AppDataSource.initialize();
-    console.log('Connected to database: ' + AppDataSource.options.database);
-    await AppDataSource.runMigrations();
-
-    server = app.listen(process.env.APP_PORT || 4000, () => {
-        console.log('Test server started');
-    });
-});
-
-afterEach(async () => {
-    jest.restoreAllMocks();
-    await repository.delete({});
-});
-  
-afterAll(async () => {
-    await AppDataSource.destroy();
-    server.close();
-});
 
 describe('/api/users', () => {
+    beforeAll(async () => {
+        await AppDataSource.initialize();
+        console.log('Connected to database: ' + AppDataSource.options.database);
+        await AppDataSource.runMigrations();
+    });
+    
+    afterEach(async () => {
+        jest.restoreAllMocks();
+        await repository.delete({});
+    });
+      
+    afterAll(async () => {
+        await AppDataSource.destroy();
+    });
+
     describe('GET /', () => {
         it('should return a list of users', async () => {
             await repository.save([
                 { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: 'photo.jpg' },
                 { name: 'Jane', lastname: 'Doe', email: 'jane@test.com', password: '123456789', avatar: 'photo.png' },
             ]);
-            const res = await request(server).get('/api/users')
+            const res = await request(app).get('/api/users')
             expect(res.status).toBe(200);
             expect(res.body).toHaveLength(2);
             expect(res.body.some((u: any) => u.name === 'John')).toBeTruthy();
@@ -52,7 +47,7 @@ describe('/api/users', () => {
 
         it('should return 500 if the repository find fail', async () => {
             jest.spyOn(repository, 'find').mockRejectedValue(new Error('Database error'));
-            const res = await request(server).get('/api/users');
+            const res = await request(app).get('/api/users');
             expect(res.status).toBe(500);
         });
     });
@@ -60,7 +55,7 @@ describe('/api/users', () => {
     describe('GET /:id', () => {
         it('should return a user by id', async () => {
             const user = await repository.save({ name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: 'photo.jpg' });
-            const res = await request(server).get(`/api/users/${user.id}`);
+            const res = await request(app).get(`/api/users/${user.id}`);
             
             expect(res.status).toBe(200);
             expect(res.body).toHaveProperty('id', user.id);
@@ -74,18 +69,18 @@ describe('/api/users', () => {
         });
 
         it('should return 400 if id is not a number', async () => {
-            const res = await request(server).get('/api/users/invalid');
+            const res = await request(app).get('/api/users/invalid');
             expect(res.status).toBe(400);
         });
 
         it('should return 500 if the repository findOne fail', async () => {
             jest.spyOn(repository, 'findOne').mockRejectedValue(new Error('Database error'));
-            const res = await request(server).get('/api/users/1');
+            const res = await request(app).get('/api/users/1');
             expect(res.status).toBe(500);
         });
 
         it('should return 404 if user not found', async () => {
-            const res = await request(server).get('/api/users/999');
+            const res = await request(app).get('/api/users/999');
             expect(res.status).toBe(404);
         });
     });
@@ -93,7 +88,7 @@ describe('/api/users', () => {
     describe('POST /', () => {
         let user: any = { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: '' };
         const exec = async () => {
-            return await request(server)
+            return await request(app)
                 .post('/api/users')
                 .send(user);
         };
@@ -262,7 +257,7 @@ describe('/api/users', () => {
         let user: any;
         let id: number;
         const exec = async () => {
-            return await request(server)
+            return await request(app)
                 .put('/api/users/' + id)
                 .set('Authorization', 'Bearer ' + token)
                 .send(user);
@@ -430,7 +425,7 @@ describe('/api/users', () => {
         let user: any = { name: 'John', lastname: 'Doe', email: 'john@test.com', password: '123456789', avatar: '' };
 
         const exec = async () => {
-            return await request(server)
+            return await request(app)
                 .delete('/api/users/' + id)
                 .set('Authorization', 'Bearer ' + token)
                 .send(user);
