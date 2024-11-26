@@ -3,6 +3,7 @@ import type {Config} from 'jest';
 const config: Config = {
   verbose: true,
   testEnvironment: "node",
+  maxWorkers: 1,
   roots: ['<rootDir>/src'], // Run tests only in the src folder
   transform: {
     "^.+.tsx?$": ["ts-jest",{}],
