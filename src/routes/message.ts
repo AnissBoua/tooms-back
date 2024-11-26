@@ -8,7 +8,6 @@ import { Conversation } from "@/models/conversation";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(Message);
-const UserRepo = AppDataSource.getRepository(User);
 const ConversationRepo = AppDataSource.getRepository(Conversation);
 
 const ZCreate = () => {
