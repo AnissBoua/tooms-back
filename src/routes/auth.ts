@@ -12,7 +12,29 @@ const ZLogin = () => {
     return (req: Request, res: Response, next: any) => {
         const schema = z.strictObject({
             email: z.string().email(),
-            password: z.string().min(1).max(255),
+            password: z.string().min(8).max(255),
+        });
+
+        try {
+            schema.parse(req.body);
+            return next();
+        } catch (error) {
+            return res.status(400).json({
+                error: (error as z.ZodError).errors.map((e: any) => {
+                    return { field: e.path.join('.'), message: e.message };
+                }),
+            });
+        }
+    }
+}
+
+const ZRegister = () => {
+    return (req: Request, res: Response, next: any) => {
+        const schema = z.strictObject({
+            name: z.string().min(1).max(255),
+            lastname: z.string().min(1).max(255),
+            email: z.string().email(),
+            password: z.string().min(8).max(255),
         });
 
         try {
@@ -36,8 +58,6 @@ router.post("/login", [ZLogin()], async (req: Request, res: Response) => {
             return;
         }
     
-        console.log(user);
-        console.log(req.body.password);
         const valid = await bcrypt.compare(req.body.password, user.password);
         if (!valid) {
             res.status(400).json({ error: "Invalid credentials" });
@@ -66,6 +86,33 @@ router.get("/whoami", async (req: Request, res: Response) => {
         res.json(user);
     } catch (error) {
         res.status(400).json({ error: 'Invalid token.' });
+    }
+});
+
+router.post("/register", [ZRegister()], async (req: Request, res: Response) => {
+    try {
+        const exists = await repository.findOne({ where: { email: req.body.email } });
+        if (exists) {
+            res.status(400).json({ error: 'User already exists' });
+            return;
+        }
+
+        const data = {
+            name: req.body.name,
+            lastname: req.body.lastname,
+            email: req.body.email,
+            password: req.body.password,
+        }
+
+        data.password = await bcrypt.hash(data.password, 10);
+        let user = repository.create(data);
+        user = await repository.save(user);
+
+        const token = JWT.sign(user);
+        res.json({token});
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error });
     }
 });
 
