@@ -12,7 +12,7 @@ const UserRepo = AppDataSource.getRepository(User);
 
 const ZValidate = () => {
     return (req: Request, res: Response, next: any) => {
-        const schema = z.object({
+        const schema = z.strictObject({
             users: z.array(z.number().int()),
         });
 
