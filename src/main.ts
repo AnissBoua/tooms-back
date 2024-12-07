@@ -1,5 +1,7 @@
 import app from './app';
 import AppDataSource from '@/config/typeorm';
+import { Server } from 'socket.io';
+import WS from './websocket';
 
 const port = process.env.APP_PORT || 3000;
 
@@ -14,11 +16,19 @@ const start = async () => {
       console.log(`Server started at http://localhost:${port}`);
     });
 
-    return server;
+    // Initialize socket.io
+    const io = new Server(server, {
+      cors: {
+        origin: '*', // TODO: Change this to the frontend URL
+      },
+    });
+    WS.init(io);
+
+    return {server, io};
   } catch (error) {
     console.error('Initialization error:', error);
     process.exit(1);
   }
 };
 
-export const server = start();
+const servers = start();
