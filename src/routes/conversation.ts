@@ -5,10 +5,12 @@ import { Conversation } from "@/models/conversation";
 import { auth } from "@/middlewares/auth";
 import { User } from "@/models/user";
 import { In } from "typeorm";
+import { Message } from "@/models/message";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(Conversation);
 const UserRepo = AppDataSource.getRepository(User);
+const MessageRepo = AppDataSource.getRepository(Message);
 
 const ZValidate = () => {
     return (req: Request, res: Response, next: any) => {
@@ -37,7 +39,40 @@ router.get('/', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        res.json(user.conversations);
+        const data = user.conversations.map(conversation => ({
+            ...conversation,
+            messages: [], // Add empty messages array
+        }));
+
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error });
+    }
+});
+
+router.get('/:id/messages', [auth], async (req: any, res: Response) => {
+    try {
+        const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: { participants: true } });
+        if (!conversation) {
+            res.status(404).json({ error: 'Conversation not found' });
+            return;
+        }
+
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.id);
+        if (exist === -1) {
+            res.status(403).json({ error: 'You are not allowed to see this conversation' });
+            return;
+        }
+
+        const page = req.query.page ? parseInt(req.query.page as string) : 1;
+        const limit = 10;
+        const offset = (page - 1) * limit;
+        const messages = await MessageRepo.find({ where: { conversation: conversation }, relations: { user: true }, take: limit, skip: offset, order: { id: 'DESC' } });
+
+        // Flip the messages array
+        messages.reverse();
+        res.json(messages);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error });
