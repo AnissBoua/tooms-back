@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "main.ts",
   "scripts": {
-    "start": "node -r dotenv/config -r tsconfig-paths/register dist/main.js",
+    "start": "node -r dotenv/config -r tsconfig-paths/register dist/src/main.js",
     "dev": "ts-node-dev -r dotenv/config -r tsconfig-paths/register src/main.ts",
     "test": "jest --watch --verbose --coverage",
     "build": "rimraf dist && tsc",
