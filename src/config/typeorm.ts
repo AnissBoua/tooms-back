@@ -14,8 +14,8 @@ const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'tooms',
   synchronize: false,
   logging: false,
-  entities: ['src/models/*{.ts,.js}'],
-  migrations: ['src/migrations/*{.ts,.js}'],
+  entities: ['dist/src/models/*{.ts,.js}'],
+  migrations: ['dist/src/migrations/*{.ts,.js}'],
 });
 
 export default AppDataSource;
