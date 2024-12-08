@@ -23,9 +23,26 @@ class WS {
 
       socket.on('login', (token: string) => {
         const user = JWT.verify(token);
+
+        if (!user) {
+          console.error('Invalid token:', token);
+          socket.disconnect();
+          return;
+        }
+
+        // // If the user is try connect again, disconnect the old socket
+        // // Possible cause close the browser without logout
+        // const oldSocketId = Array.from(this.sockets.entries()).find(([sok_id, id]) => id === user.id)?.[0];
+        // if (oldSocketId) {
+        //   console.log('Disconnecting old socket:', oldSocketId);
+        //   this.io.sockets.sockets.get(oldSocketId)?.disconnect();
+        // }
+
+
         this.sockets.set(socket.id, user.id);
+        this.io.to(socket.id).emit('authenticated', user.id);
         console.log('Connected users:', this.sockets);
-        
+
         socket.on('message', async (data: Msg) => {
           console.log('Message received:', socket.id);
           this.onMessage(data);
