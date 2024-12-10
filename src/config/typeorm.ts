@@ -5,6 +5,8 @@ import { DataSource } from 'typeorm';
 const env = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
 dotenv.config({ path: env });
 
+const production = process.env.NODE_ENV === 'production';
+
 const AppDataSource = new DataSource({
   type: 'mysql',
   host: process.env.DB_HOST || 'localhost',
@@ -14,8 +16,8 @@ const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'tooms',
   synchronize: false,
   logging: false,
-  entities: ['dist/src/models/*{.ts,.js}'],
-  migrations: ['dist/src/migrations/*{.ts,.js}'],
+  entities: production ? ['dist/src/models/*{.ts,.js}'] : ['src/models/*{.ts,.js}'],
+  migrations: production ? ['dist/src/migrations/*{.ts,.js}'] : ['src/migrations/*{.ts,.js}'],
 });
 
 export default AppDataSource;

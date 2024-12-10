@@ -47,30 +47,53 @@ class WS {
           console.log('Message received:', socket.id);
           this.onMessage(data);
         });
+
+        socket.on('call', async (data: any) => {
+          this.onCall(data);
+        });
+
+        socket.on('candidate', async (data: any) => {
+          this.onCandidate(data);
+        })
       });
     });
+  }
+
+  // Sockets to send the message
+  private static async participants(conversationID: number, userID: number | null = null) {
+    try {
+      const conversation = await ConversationRepo.findOne({ where: { id: conversationID }, relations: { participants: true } });
+      if (!conversation) throw new Error('Conversation not found');
+
+      let participants = conversation.participants.map((u: User) => u.id);
+      if (userID) participants = participants.filter((id: number) => id !== userID);
+
+      return participants;
+    } catch (error) {
+      console.error('Error getting participants:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static usersToSockets(users: number[]) {
+    return Array.from(this.sockets.entries())
+      .filter(([_, id]) => users.includes(id))
+      .map(([id, _]) => id);
   }
 
   private static async onMessage(data: Msg) {
     console.log('Message received:', data);
     try {
-      const conversation = await ConversationRepo.findOne({ where: { id: data.conversation }, relations: { participants: true } });
-      if (!conversation) {
-        throw new Error('Conversation not found');
-      }
+      const participants = await this.participants(data.conversation, data.user);
+      if (!participants) throw new Error('No participants found');
+
       const message = await MessageService.create(data);
-
-      let participants = conversation.participants.map((u: User) => u.id);
-      participants = participants.filter((id: number) => id !== data.user);
-
-      const socketIds = Array.from(this.sockets.entries())
-        .filter(([_, id]) => participants.includes(id))
-        .map(([id, _]) => id);
-
-      console.log('Sending message to:', socketIds);
+      
+      const sockets = this.usersToSockets(participants);
       // Send message to the conversation
-      for (const socketId of socketIds) {
-        this.io.to(socketId).emit('message', message);
+      console.log('Sending message to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('message', message);
       }
     } catch (error) {
       console.error('Error saving message:', error);
@@ -78,6 +101,41 @@ class WS {
     }
   }
 
+  private static async onCall(data: any) {
+    try {
+      const participants = await this.participants(data.conversation, data.user);
+      if (!participants) throw new Error('No participants found');
+
+      const sockets = this.usersToSockets(participants);
+
+      // Send call to the conversation
+      console.log('Sending call to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('call', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static async onCandidate(data: any) {
+    try {
+      const participants = await this.participants(data.conversation, data.user);
+      if (!participants) throw new Error('No participants found');
+
+      const sockets = this.usersToSockets(participants);
+
+      // Send candidate to the conversation
+      console.log('Sending candidate to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('candidate', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
 }
 
 export default WS;
