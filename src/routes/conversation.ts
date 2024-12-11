@@ -33,7 +33,7 @@ const ZValidate = () => {
 
 router.get('/', [auth], async (req: any, res: Response) => {
     try {
-        const user = await UserRepo.findOne({ where: {id: req.user.id}, relations: { conversations: { participants: true } } });
+        const user = await UserRepo.findOne({ where: {id: req.user.sub}, relations: { conversations: { participants: true } } });
         if (!user) {
             res.status(404).json({ error: 'User not found' });
             return;
@@ -59,7 +59,7 @@ router.get('/:id/messages', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.id);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to see this conversation' });
             return;
@@ -102,7 +102,7 @@ router.put('/:id/add', [auth, ZValidate()], async (req: any, res: Response) => {
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.id);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to delete this conversation' });
             return;
@@ -132,7 +132,7 @@ router.put('/:id/remove', [auth, ZValidate()], async (req: any, res: Response) =
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.id);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to delete this conversation' });
             return;
@@ -163,7 +163,7 @@ router.delete('/:id', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.id);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to delete this conversation' });
             return;

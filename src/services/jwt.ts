@@ -11,9 +11,14 @@ class JWT {
     }
 
     static verify(token: string) : any {
-        if (token.startsWith("Bearer ")) token = token.split(" ")[1]; // Extract the token after "Bearer"
-        const key = fs.readFileSync("jwt/public.pem", "utf8");
-        return jwt.verify(token, key);
+        try {
+            if (token.startsWith("Bearer ")) token = token.split(" ")[1]; // Extract the token after "Bearer"
+            const key = fs.readFileSync("jwt/public.pem", "utf8");
+            return jwt.verify(token, key);
+        } catch (error) {
+            console.error(error);
+            return null;            
+        }
     }
 
     static expires(date: Date) : number {

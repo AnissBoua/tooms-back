@@ -11,7 +11,7 @@ const auth = async (req: any, res: any, next: NextFunction) => {
     }
     try {
         const decoded = JWT.verify(token);
-        if (!decoded.sub) {
+        if (!decoded) {
             res.status(400).json({ error: 'Invalid token.' });
             return;
         }

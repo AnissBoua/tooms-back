@@ -57,12 +57,12 @@ router.post('/', [auth, ZCreate()], async (req: any, res: Response) => {
             return;
         }
 
-        if (!conversation.participants.some((u: User) => u.id === req.user.id)) {
+        if (!conversation.participants.some((u: User) => u.id === req.user.sub)) {
             res.status(403).json({ error: 'You are not part of this conversation' });
             return;
         }
 
-        const data = { ...req.body, user: req.user.id };
+        const data = { ...req.body, user: req.user.sub };
         const message = await repository.save(data);
         res.json(message);
         // TODO: Send message to conversation with websockets
@@ -79,7 +79,7 @@ router.put('/:id', [auth, ZUpdate()], async (req: any, res: Response) => {
             return;
         }
 
-        if (message.user.id !== req.user.id) {
+        if (message.user.id !== req.user.sub) {
             res.status(403).json({ error: 'You are not the owner of this message' });
             return;
         }
@@ -101,7 +101,7 @@ router.delete('/:id', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        if (message.user.id !== req.user.id) {
+        if (message.user.id !== req.user.sub) {
             res.status(403).json({ error: 'You are not the owner of this message' });
             return;
         }
