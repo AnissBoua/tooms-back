@@ -4,9 +4,12 @@ import { Request, Response, Router } from "express";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import { JWT } from "@/services/jwt";
+import { RefreshToken } from "@/models/refreshtoken";
+import { IsNull, MoreThan } from "typeorm";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(User);
+const refreshRepository = AppDataSource.getRepository(RefreshToken);
 
 const ZLogin = () => {
     return (req: Request, res: Response, next: any) => {
@@ -65,10 +68,16 @@ router.post("/login", [ZLogin()], async (req: Request, res: Response) => {
         }
     
         const token = JWT.sign(user, 60 * 15);
-        const refresh = JWT.sign(user, 60 * 60 * 24 * 7);
+        const refresh = new RefreshToken();
+        refresh.token = JWT.sign(user, 60 * 60 * 24 * 7);
+        refresh.jwtid = JWT.verify(token).jti;
+        refresh.user = user;
+        refresh.expires_at = new Date(JWT.verify(refresh.token).exp * 1000);
+        await refreshRepository.save(refresh);
+
         res.json({
-            token,
-            refresh,
+            token: token,
+            refresh: refresh.token,
         });
     } catch (error) {
         console.error(error);
@@ -84,6 +93,11 @@ router.get("/whoami", async (req: Request, res: Response) => {
     }
     try {
         const decoded = JWT.verify(token);
+        if (!decoded.sub) {
+            res.status(400).json({ error: 'Invalid token.' });
+            return;
+        }
+
         let user = await repository.findOne({ where: { id: decoded.sub }, select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'] });
         res.json(user);
     } catch (error) {
@@ -111,7 +125,12 @@ router.post("/register", [ZRegister()], async (req: Request, res: Response) => {
         user = await repository.save(user);
 
         const token = JWT.sign(user, 60 * 15);
-        const refresh = JWT.sign(user, 60 * 60 * 24 * 7);
+        const refresh = new RefreshToken();
+        refresh.token = JWT.sign(user, 60 * 60 * 24 * 7);
+        refresh.jwtid = JWT.verify(token).jti;
+        refresh.user = user;
+        refresh.expires_at = new Date(JWT.verify(refresh.token).exp * 1000);
+        await refreshRepository.save(refresh);
 
         res.json({ 
             token, 
@@ -125,22 +144,42 @@ router.post("/register", [ZRegister()], async (req: Request, res: Response) => {
 
 router.post("/refresh", async (req: Request, res: Response) => {
     try {
-        const refresh = req.body.refresh;
+        let refresh = req.body.refresh;
         if (!refresh) {
             res.status(401).json({ error: 'Access denied. No refresh token provided.' });
             return;
         }
-        
-        const decoded = JWT.verify(refresh);
-        let user = await repository.findOne({ where: { id: decoded.sub }, select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'] });
-        if (!user) {
+
+        refresh = await refreshRepository.findOne({ where: { token: refresh, expires_at: MoreThan(new Date()), revoked_at: IsNull() }, relations: { user: true } });
+        if (!refresh) {
             res.status(400).json({ error: 'Invalid token.' });
             return;
         }
 
-        const token = JWT.sign(user, 60 * 15);
-        const newRefresh = JWT.sign(user, 60 * 60 * 24 * 7);
-        res.json({ token, newRefresh });
+        // TODO: Refresh Token Automatic Reuse Detection : https://auth0.com/blog/refresh-tokens-what-are-they-and-when-to-use-them/
+        if (refresh.used_at) {
+            res.status(400).json({ error: 'Token already used.' });
+            return;
+        }
+
+        refresh.used_at = new Date();
+        await refreshRepository.update(refresh.id, { used_at: refresh.used_at });
+        
+        // TODO: Invalidate old token
+
+        const token = JWT.sign(refresh.user, 60 * 15);
+        const updated = new RefreshToken();
+        updated.token = JWT.sign(refresh.user, JWT.expires(new Date(refresh.expires_at)));
+        updated.jwtid = JWT.verify(token).jti;
+        updated.user = refresh.user;
+        updated.expires_at = refresh.expires_at;
+        await refreshRepository.save(updated);
+
+        res.json({ 
+            token: token, 
+            updated: updated.token
+        });
+
     } catch (error) {
         res.status(400).json({ error: 'Invalid token.' });
     }

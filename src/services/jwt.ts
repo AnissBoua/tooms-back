@@ -15,6 +15,10 @@ class JWT {
         const key = fs.readFileSync("jwt/public.pem", "utf8");
         return jwt.verify(token, key);
     }
+
+    static expires(date: Date) : number {
+        return Math.floor((date.getTime() - new Date().getTime()) / 1000);
+    }
 }
 
 export { JWT };
