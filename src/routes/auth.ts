@@ -64,9 +64,11 @@ router.post("/login", [ZLogin()], async (req: Request, res: Response) => {
             return;
         }
     
-        const token = JWT.sign(user);
+        const token = JWT.sign(user, 60 * 15);
+        const refresh = JWT.sign(user, 60 * 60 * 24 * 7);
         res.json({
-            token
+            token,
+            refresh,
         });
     } catch (error) {
         console.error(error);
@@ -82,7 +84,7 @@ router.get("/whoami", async (req: Request, res: Response) => {
     }
     try {
         const decoded = JWT.verify(token);
-        let user = await repository.findOne({ where: { id: decoded.id }, select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'] });
+        let user = await repository.findOne({ where: { id: decoded.sub }, select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'] });
         res.json(user);
     } catch (error) {
         res.status(400).json({ error: 'Invalid token.' });
@@ -108,11 +110,39 @@ router.post("/register", [ZRegister()], async (req: Request, res: Response) => {
         let user = repository.create(data);
         user = await repository.save(user);
 
-        const token = JWT.sign(user);
-        res.json({token});
+        const token = JWT.sign(user, 60 * 15);
+        const refresh = JWT.sign(user, 60 * 60 * 24 * 7);
+
+        res.json({ 
+            token, 
+            refresh 
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error });
+    }
+});
+
+router.post("/refresh", async (req: Request, res: Response) => {
+    try {
+        const refresh = req.body.refresh;
+        if (!refresh) {
+            res.status(401).json({ error: 'Access denied. No refresh token provided.' });
+            return;
+        }
+        
+        const decoded = JWT.verify(refresh);
+        let user = await repository.findOne({ where: { id: decoded.sub }, select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'] });
+        if (!user) {
+            res.status(400).json({ error: 'Invalid token.' });
+            return;
+        }
+
+        const token = JWT.sign(user, 60 * 15);
+        const newRefresh = JWT.sign(user, 60 * 60 * 24 * 7);
+        res.json({ token, newRefresh });
+    } catch (error) {
+        res.status(400).json({ error: 'Invalid token.' });
     }
 });
 
