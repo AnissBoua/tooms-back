@@ -127,7 +127,7 @@ router.put('/:id', [auth, ZID(), ZUpdate()], async (req: any, res: Response) => 
             return;
         }
 
-        if (req.user.id !== user.id) {
+        if (req.user.sub !== user.id) {
             res.status(403).json({ error: 'Forbidden' });
             return;
         }
@@ -155,7 +155,7 @@ router.delete('/:id', [auth, ZID()], async (req: any, res: Response) => {
             return;
         }
 
-        if (req.user.id !== user.id) {
+        if (req.user.sub !== user.id) {
             res.status(403).json({ error: 'Forbidden' });
             return;
         }

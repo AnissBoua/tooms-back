@@ -2,6 +2,7 @@ import app from './app';
 import AppDataSource from '@/config/typeorm';
 import { Server } from 'socket.io';
 import WS from './websocket';
+import '@/crons/refreshtoken';
 
 const port = process.env.APP_PORT || 3000;
 

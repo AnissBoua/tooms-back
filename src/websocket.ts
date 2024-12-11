@@ -39,8 +39,8 @@ class WS {
         // }
 
 
-        this.sockets.set(socket.id, user.id);
-        this.io.to(socket.id).emit('authenticated', user.id);
+        this.sockets.set(socket.id, user.sub);
+        this.io.to(socket.id).emit('authenticated', user.sub);
         console.log('Connected users:', this.sockets);
 
         socket.on('message', async (data: Msg) => {
