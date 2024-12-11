@@ -6,10 +6,13 @@ import bcrypt from "bcrypt";
 import { JWT } from "@/services/jwt";
 import { RefreshToken } from "@/models/refreshtoken";
 import { IsNull, MoreThan } from "typeorm";
+import { TokenBlacklist } from "@/models/tokenblacklist";
+import { auth } from "@/middlewares/auth";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(User);
 const refreshRepository = AppDataSource.getRepository(RefreshToken);
+const blacklistRepository = AppDataSource.getRepository(TokenBlacklist);
 
 const ZLogin = () => {
     return (req: Request, res: Response, next: any) => {
@@ -53,6 +56,27 @@ const ZRegister = () => {
     }
 }
 
+// Refresh Token Automatic Reuse Detection : https://auth0.com/blog/refresh-tokens-what-are-they-and-when-to-use-them/
+const RTARD = async (user: User) => {
+    try {
+        const refreshes = await refreshRepository.find({ where: { user: user } });
+        await refreshRepository.update({ user: user}, { revoked_at: new Date() });
+
+        const blacklist = [];
+        for (let refresh of refreshes) {
+            const token = new TokenBlacklist();
+            token.jwtid = refresh.jwtid; // Access Token JWT ID
+            token.expires_at = refresh.expires_at;
+            blacklist.push(token);
+        }
+
+        await blacklistRepository.save(blacklist);
+        // TODO: Send email to admin
+    } catch (error) {
+        console.error('Error revoking refresh tokens:', error);
+    }
+}
+
 router.post("/login", [ZLogin()], async (req: Request, res: Response) => {
     try {
         let user = await repository.findOne({ where: { email: req.body.email }, select: ['id', 'password'] });
@@ -85,7 +109,7 @@ router.post("/login", [ZLogin()], async (req: Request, res: Response) => {
     }
 });
 
-router.get("/whoami", async (req: Request, res: Response) => {
+router.get("/whoami", [auth], async (req: Request, res: Response) => {
     const token = req.header('Authorization');
     if (!token) {
         res.status(401).json({ error: 'Access denied. No token provided.' });
@@ -146,7 +170,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
     try {
         let refresh = req.body.refresh;
         if (!refresh) {
-            res.status(401).json({ error: 'Access denied. No refresh token provided.' });
+            res.status(401).json({ error: 'Unauthorized.' });
             return;
         }
 
@@ -156,17 +180,15 @@ router.post("/refresh", async (req: Request, res: Response) => {
             return;
         }
 
-        // TODO: Refresh Token Automatic Reuse Detection : https://auth0.com/blog/refresh-tokens-what-are-they-and-when-to-use-them/
         if (refresh.used_at) {
-            res.status(400).json({ error: 'Token already used.' });
+            RTARD(refresh.user);
+            res.status(401).json({ error: 'Unauthorized.' });
             return;
         }
 
         refresh.used_at = new Date();
         await refreshRepository.update(refresh.id, { used_at: refresh.used_at });
         
-        // TODO: Invalidate old token
-
         const token = JWT.sign(refresh.user, 60 * 15);
         const updated = new RefreshToken();
         updated.token = JWT.sign(refresh.user, JWT.expires(new Date(refresh.expires_at)));
@@ -177,7 +199,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
 
         res.json({ 
             token: token, 
-            updated: updated.token
+            refresh: updated.token
         });
 
     } catch (error) {
