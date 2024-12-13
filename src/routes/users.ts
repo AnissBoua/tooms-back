@@ -4,6 +4,7 @@ import { User } from "@/models/user";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import { auth } from "@/middlewares/auth";
+import { Like } from "typeorm";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(User);
@@ -76,6 +77,29 @@ router.get('/', async (req: Request, res: Response) => {
     try {
         const users = await repository.find({ select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'] });
         res.json(users);      
+    } catch (error) {
+        res.status(500).json({ error });
+    }
+});
+
+router.get('/search', [auth], async (req: any, res: Response) => {
+    try {
+        if (!req.query.search || req.query.search === '') {
+            res.json([]);
+            return;
+        }
+        let users = await repository.find({
+            where: [{ name: Like(`%${req.query.search}%`)}, { lastname: Like(`%${req.query.search}%`) }, { email: Like(`%${req.query.search}%`) }],
+            select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'],
+        });
+        if (!users) {
+            res.status(404).json({ error: 'users not found' });
+            return;
+        }
+
+        users = users.filter((user) => user.id !== req.user.sub);
+
+        res.json(users);
     } catch (error) {
         res.status(500).json({ error });
     }
