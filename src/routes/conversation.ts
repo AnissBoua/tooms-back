@@ -79,8 +79,10 @@ router.get('/:id/messages', [auth], async (req: any, res: Response) => {
     }
 });
 
-router.post('/', [auth, ZValidate()], async (req: Request, res: Response) => {
+router.post('/', [auth, ZValidate()], async (req: any, res: Response) => {
     try {
+        if (!req.body.users.includes(req.user.sub)) req.body.users.push(req.user.sub); // Add the user to the conversation
+        
         const users = await UserRepo.findBy({ id: In(req.body.users) });
         if (users.length !== req.body.users.length) {
             res.status(400).json({ error: 'Some users were not found' });
