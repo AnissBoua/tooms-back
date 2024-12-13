@@ -12,6 +12,26 @@ const repository = AppDataSource.getRepository(Conversation);
 const UserRepo = AppDataSource.getRepository(User);
 const MessageRepo = AppDataSource.getRepository(Message);
 
+const ZCreate = () => {
+    return (req: Request, res: Response, next: any) => {
+        const schema = z.strictObject({
+            name: z.string().optional(),
+            users: z.array(z.number().int()),
+        });
+
+        try {
+            schema.parse(req.body);
+            return next();
+        } catch (error) {
+            return res.status(400).json({
+                error: (error as z.ZodError).errors.map((e: any) => {
+                    return { field: e.path.join('.'), message: e.message };
+                }),
+            });
+        }
+    }
+}
+
 const ZValidate = () => {
     return (req: Request, res: Response, next: any) => {
         const schema = z.strictObject({
@@ -79,7 +99,7 @@ router.get('/:id/messages', [auth], async (req: any, res: Response) => {
     }
 });
 
-router.post('/', [auth, ZValidate()], async (req: any, res: Response) => {
+router.post('/', [auth, ZCreate()], async (req: any, res: Response) => {
     try {
         if (!req.body.users.includes(req.user.sub)) req.body.users.push(req.user.sub); // Add the user to the conversation
         
@@ -89,7 +109,10 @@ router.post('/', [auth, ZValidate()], async (req: any, res: Response) => {
             return;
         }
 
-        const conversation = await repository.save({ participants: users });
+        const conversation = await repository.save({ 
+            name: req.body.name || null, 
+            participants: users 
+        });
         res.json(conversation);
     } catch (error) {
         res.status(500).json({ error });
