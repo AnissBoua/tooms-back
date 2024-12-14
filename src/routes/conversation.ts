@@ -86,7 +86,7 @@ router.get('/:id/messages', [auth], async (req: any, res: Response) => {
         }
 
         const page = req.query.page ? parseInt(req.query.page as string) : 1;
-        const limit = 10;
+        const limit = 50;
         const offset = (page - 1) * limit;
         const messages = await MessageRepo.find({ where: { conversation: conversation }, relations: { user: true, conversation: true }, take: limit, skip: offset, order: { id: 'DESC' } });
 
