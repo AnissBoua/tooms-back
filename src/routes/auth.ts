@@ -118,14 +118,14 @@ router.get("/whoami", [auth], async (req: Request, res: Response) => {
     try {
         const decoded = JWT.verify(token);
         if (!decoded) {
-            res.status(400).json({ error: 'Invalid token.' });
+            res.status(401).json({ error: 'Invalid token.' });
             return;
         }
 
         let user = await repository.findOne({ where: { id: decoded.sub }, select: ['id', 'name', 'lastname', 'email', 'avatar', 'created_at', 'updated_at'] });
         res.json(user);
     } catch (error) {
-        res.status(400).json({ error: 'Invalid token.' });
+        res.status(401).json({ error: 'Invalid token.' });
     }
 });
 
