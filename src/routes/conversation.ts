@@ -71,6 +71,32 @@ router.get('/', [auth], async (req: any, res: Response) => {
     }
 });
 
+router.get('/:id', [auth], async (req: any, res: Response) => {
+    try {
+        const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: { participants: true } });
+        if (!conversation) {
+            res.status(404).json({ error: 'Conversation not found' });
+            return;
+        }
+
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
+        if (exist === -1) {
+            res.status(403).json({ error: 'You are not allowed to see this conversation' });
+            return;
+        }
+
+        const data = {
+            ...conversation,
+            messages: [], // Add empty messages array
+        };
+
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error });
+    }
+});
+
 router.get('/:id/messages', [auth], async (req: any, res: Response) => {
     try {
         const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: { participants: true } });
