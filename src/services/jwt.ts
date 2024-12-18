@@ -14,7 +14,12 @@ class JWT {
         try {
             if (token.startsWith("Bearer ")) token = token.split(" ")[1]; // Extract the token after "Bearer"
             const key = fs.readFileSync("jwt/public.pem", "utf8");
-            return jwt.verify(token, key);
+            let tmp = jwt.verify(token, key);
+
+            const res = tmp as any;
+            res.sub = parseInt(res.sub);
+
+            return res;
         } catch (error) {
             console.error(error);
             return null;            

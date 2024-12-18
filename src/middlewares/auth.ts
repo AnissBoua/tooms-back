@@ -21,7 +21,6 @@ const auth = async (req: any, res: any, next: NextFunction) => {
             res.status(401).json({ error: 'Unauthorized.' });
             return;
         }
-        decoded.sub = parseInt(decoded.sub);
         req.user = decoded;
         next();
     } catch (error) {
