@@ -139,7 +139,7 @@ class WS {
       const sockets = this.usersToSockets(participants);
 
       // Send candidate to the conversation
-      // console.log('Sending candidate to:', sockets);
+      console.log('Sending candidate to:', sockets);
       for (const id of sockets) {
         this.io.to(id).emit('candidate', data);
       }
