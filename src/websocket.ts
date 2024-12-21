@@ -52,6 +52,10 @@ class WS {
           this.onCall(data);
         });
 
+        socket.on('trigger-candidates', async (data: any) => {
+          this.onTriggerCandidate(data);
+        })
+
         socket.on('candidate', async (data: any) => {
           this.onCandidate(data);
         })
@@ -124,6 +128,24 @@ class WS {
       console.log('Sending call to:', sockets);
       for (const id of sockets) {
         this.io.to(id).emit('call', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static async onTriggerCandidate(data: any) {
+    try {
+      const participants = await this.participants(data.conversation, data.user.id);
+      if (!participants) throw new Error('No participants found');
+
+      const sockets = this.usersToSockets(participants);
+
+      // Send candidate to the conversation
+      console.log('Sending trigger candidate to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('trigger-candidates', data);
       }
     } catch (error) {
       console.error('Error receiving call:', error);
