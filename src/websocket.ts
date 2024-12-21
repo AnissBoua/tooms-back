@@ -172,7 +172,6 @@ class WS {
       const participants = await this.participants(data.conversation, data.user.id);
       if (!participants) throw new Error('No participants found');
 
-      console.log('Participants require signal:', participants);
       const sockets = this.usersToSockets(participants);
 
       // Send candidate to the conversation
