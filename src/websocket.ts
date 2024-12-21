@@ -76,6 +76,25 @@ class WS {
     });
   }
 
+  private static async conversation(conversationID: number, userID: number | null = null) {
+    try {
+      const conversation = await ConversationRepo.findOne({ where: { id: conversationID }, relations: { participants: true } });
+      if (!conversation) throw new Error('Conversation not found');
+
+      let participants = conversation.participants.map((u: User) => u.id);
+      
+      if (userID) {
+        const allowed = participants.findIndex((id: number) => id === userID);
+        if (allowed === -1) throw new Error('User not allowed to see this conversation');
+      }
+
+      return participants;
+    } catch (error) {
+      console.error('Error getting participants:', error);
+      this.io.emit('error', error);
+    }
+  }
+
   // Sockets to send the message
   private static async participants(conversationID: number, userID: number | null = null) {
     try {
@@ -119,9 +138,10 @@ class WS {
 
   private static async onCall(data: any) {
     try {
-      const participants = await this.participants(data.conversation, data.user.id);
+      let participants = await this.conversation(data.conversation, data.toID);
       if (!participants) throw new Error('No participants found');
 
+      participants = participants.filter((id: number) => id === data.toID);
       const sockets = this.usersToSockets(participants);
 
       // Send call to the conversation
