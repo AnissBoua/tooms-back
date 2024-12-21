@@ -1,9 +1,12 @@
 import { Server, Socket } from "socket.io";
-import { Msg, MessageService } from "./services/message";
+import { Msg, MessageService } from "@/services/message";
 import { User } from "@/models/user";
-import { JWT } from "./services/jwt";
-import AppDataSource from "./config/typeorm";
-import { Conversation } from "./models/conversation";
+import { JWT } from "@/services/jwt";
+import AppDataSource from "@/config/typeorm";
+import { Conversation } from "@/models/conversation";
+import { RTCSignal } from "@/types/RTCSignal";
+import { RTCCandidate } from "@/types/RTCCandidate";
+import { RTCSignalRequest } from "@/types/RTCSignalRequest";
 
 const ConversationRepo = AppDataSource.getRepository(Conversation);
 
@@ -11,6 +14,8 @@ class WS {
   private static io: Server;
   // Map<socketId, userId>
   private static sockets: Map<string, number> = new Map();
+  // Map<conversationId, userId[]>
+  private static conversations: Map<number, number[]> = new Map();
 
   static init(io: Server) {
     this.io = io;
@@ -48,32 +53,55 @@ class WS {
           this.onMessage(data);
         });
 
-        socket.on('call', async (data: any) => {
+        socket.on('call', async (data: RTCSignal) => {
+          if (data.data.type === 'offer') this.setconversation(data.conversation, data.user.id);
+          else if (data.data.type === 'answer') this.setconversation(data.conversation, data.user.id);
+
+          data.actives = this.conversations.get(data.conversation) || [];
+          
           this.onCall(data);
         });
 
-        socket.on('trigger-candidates', async (data: any) => {
+        socket.on('multi-call', async (data: RTCSignal) => {
+          const actives = this.conversations.get(data.conversation) || [];
+          const sockets = this.usersToSockets([data.user.id]);
+
+          // Send call to the conversation
+          console.log('Sending multi-call to:', sockets);
+          for (const id of sockets) {
+            this.io.to(id).emit('multi-call', actives);
+          }
+        });
+
+        socket.on('trigger-candidates', async (data: RTCSignal) => {
           this.onTriggerCandidate(data);
         })
 
-        socket.on('candidate', async (data: any) => {
+        socket.on('candidate', async (data: RTCCandidate) => {
           this.onCandidate(data);
         })
 
-        socket.on('negotiation', async (data: any) => {
+        socket.on('negotiation', async (data: RTCSignal) => {
           this.onNegotiation(data);
         })
 
-        socket.on('require-signal', async (data: any) => {
+        socket.on('require-signal', async (data: RTCSignalRequest) => {
           this.onRequireSignal(data);
         })
 
-        socket.on('signal', async (data: any) => {
+        socket.on('signal', async (data: RTCSignal) => {
           this.onSignal(data);
         })
 
       });
     });
+  }
+
+  private static setconversation(conversation: number, user: number) {
+    if (!this.conversations.has(conversation)) this.conversations.set(conversation, []);
+    const users = this.conversations.get(conversation);
+    if (!users) return;
+    if (!users.includes(user)) this.conversations.set(conversation, [...users, user]);
   }
 
   private static async conversation(conversationID: number, userID: number | null = null) {
