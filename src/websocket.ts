@@ -55,6 +55,19 @@ class WS {
         socket.on('candidate', async (data: any) => {
           this.onCandidate(data);
         })
+
+        socket.on('negotiation', async (data: any) => {
+          this.onNegotiation(data);
+        })
+
+        socket.on('require-signal', async (data: any) => {
+          this.onRequireSignal(data);
+        })
+
+        socket.on('signal', async (data: any) => {
+          this.onSignal(data);
+        })
+
       });
     });
   }
@@ -82,7 +95,6 @@ class WS {
   }
 
   private static async onMessage(data: Msg) {
-    console.log('Message received:', data);
     try {
       const participants = await this.participants(data.conversation, data.user);
       if (!participants) throw new Error('No participants found');
@@ -103,7 +115,7 @@ class WS {
 
   private static async onCall(data: any) {
     try {
-      const participants = await this.participants(data.conversation, data.user);
+      const participants = await this.participants(data.conversation, data.user.id);
       if (!participants) throw new Error('No participants found');
 
       const sockets = this.usersToSockets(participants);
@@ -130,6 +142,60 @@ class WS {
       console.log('Sending candidate to:', sockets);
       for (const id of sockets) {
         this.io.to(id).emit('candidate', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static async onNegotiation(data: any) {
+    try {
+      const participants = await this.participants(data.conversation, data.user.id);
+      if (!participants) throw new Error('No participants found');
+
+      const sockets = this.usersToSockets(participants);
+
+      // Send candidate to the conversation
+      console.log('Sending negotiation to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('negotiation', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static async onRequireSignal(data: any) {
+    try {
+      const participants = await this.participants(data.conversation, data.user.id);
+      if (!participants) throw new Error('No participants found');
+
+      const sockets = this.usersToSockets(participants);
+
+      // Send candidate to the conversation
+      console.log('Sending require signal to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('require-signal', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static async onSignal(data: any) {
+    try {
+      const participants = await this.participants(data.conversation, data.user.id);
+      if (!participants) throw new Error('No participants found');
+
+      const sockets = this.usersToSockets(participants);
+
+      // Send candidate to the conversation
+      console.log('Sending signal to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('signal', data);
       }
     } catch (error) {
       console.error('Error receiving call:', error);
