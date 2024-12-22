@@ -8,6 +8,7 @@ import { RTCSignal } from "@/types/RTCSignal";
 import { RTCCandidate } from "@/types/RTCCandidate";
 import { RTCSignalRequest } from "@/types/RTCSignalRequest";
 import { RTCConnected } from "./types/RTCConnected";
+import { RTCBase } from "./types/RTCBase";
 
 const ConversationRepo = AppDataSource.getRepository(Conversation);
 
@@ -82,7 +83,7 @@ class WS {
           }
         });
 
-        socket.on('trigger-candidates', async (data: RTCSignal) => {
+        socket.on('trigger-candidates', async (data: RTCBase) => {
           this.onTriggerCandidate(data);
         })
 
@@ -195,11 +196,12 @@ class WS {
     }
   }
 
-  private static async onTriggerCandidate(data: any) {
+  private static async onTriggerCandidate(data: RTCBase) {
     try {
-      const participants = await this.participants(data.conversation, data.user.id);
+      let participants = await this.conversation(data.conversation, data.receiver);
       if (!participants) throw new Error('No participants found');
 
+      participants = participants.filter((id: number) => id === data.receiver);
       const sockets = this.usersToSockets(participants);
 
       // Send candidate to the conversation
