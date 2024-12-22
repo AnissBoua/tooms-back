@@ -1,9 +1,14 @@
 import { Server, Socket } from "socket.io";
-import { Msg, MessageService } from "./services/message";
+import { Msg, MessageService } from "@/services/message";
 import { User } from "@/models/user";
-import { JWT } from "./services/jwt";
-import AppDataSource from "./config/typeorm";
-import { Conversation } from "./models/conversation";
+import { JWT } from "@/services/jwt";
+import AppDataSource from "@/config/typeorm";
+import { Conversation } from "@/models/conversation";
+import { RTCSignal } from "@/types/RTCSignal";
+import { RTCCandidate } from "@/types/RTCCandidate";
+import { RTCSignalRequest } from "@/types/RTCSignalRequest";
+import { RTCConnected } from "./types/RTCConnected";
+import { RTCBase } from "./types/RTCBase";
 
 const ConversationRepo = AppDataSource.getRepository(Conversation);
 
@@ -11,6 +16,8 @@ class WS {
   private static io: Server;
   // Map<socketId, userId>
   private static sockets: Map<string, number> = new Map();
+  // Map<conversationId, userId[]>
+  private static conversations: Map<number, number[]> = new Map();
 
   static init(io: Server) {
     this.io = io;
@@ -18,6 +25,14 @@ class WS {
       console.log('A user connected:', socket.id);
       socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+        for (const [conversation, users] of this.conversations.entries()) {
+          const index = users.findIndex((id: number) => id === this.sockets.get(socket.id));
+          if (index !== -1) {
+            users.splice(index, 1);
+            this.conversations.set(conversation, users);
+          }
+          if (users.length === 0) this.conversations.delete(conversation);
+        }
         this.sockets.delete(socket.id);
       });
 
@@ -48,28 +63,77 @@ class WS {
           this.onMessage(data);
         });
 
-        socket.on('call', async (data: any) => {
+        socket.on('call', async (data: RTCSignal) => {
+          if (data.data.type === 'offer') this.setconversation(data.conversation, data.user.id);
+          else if (data.data.type === 'answer') this.setconversation(data.conversation, data.user.id);
+
+          data.actives = this.conversations.get(data.conversation) || [];
+          
           this.onCall(data);
         });
 
-        socket.on('candidate', async (data: any) => {
+        socket.on('multi-call', async (data: RTCSignal) => {
+          const actives = this.conversations.get(data.conversation) || [];
+          const sockets = this.usersToSockets([data.user.id]);
+
+          // Send call to the conversation
+          console.log('Sending multi-call to:', sockets);
+          for (const id of sockets) {
+            this.io.to(id).emit('multi-call', actives);
+          }
+        });
+
+        socket.on('trigger-candidates', async (data: RTCBase) => {
+          this.onTriggerCandidate(data);
+        })
+
+        socket.on('candidates', async (data: RTCCandidate) => {
           this.onCandidate(data);
         })
 
-        socket.on('negotiation', async (data: any) => {
+        socket.on('negotiation', async (data: RTCSignal) => {
           this.onNegotiation(data);
         })
 
-        socket.on('require-signal', async (data: any) => {
+        socket.on('require-signal', async (data: RTCSignalRequest) => {
           this.onRequireSignal(data);
         })
 
-        socket.on('signal', async (data: any) => {
+        socket.on('signal', async (data: RTCSignal) => {
           this.onSignal(data);
         })
 
+        socket.on('connected', async (data: RTCConnected) => {
+          this.onConnected(data);
+        })
       });
     });
+  }
+
+  private static setconversation(conversation: number, user: number) {
+    if (!this.conversations.has(conversation)) this.conversations.set(conversation, []);
+    const users = this.conversations.get(conversation);
+    if (!users) return;
+    if (!users.includes(user)) this.conversations.set(conversation, [...users, user]);
+  }
+
+  private static async conversation(conversationID: number, userID: number | null = null) {
+    try {
+      const conversation = await ConversationRepo.findOne({ where: { id: conversationID }, relations: { participants: true } });
+      if (!conversation) throw new Error('Conversation not found');
+
+      let participants = conversation.participants.map((u: User) => u.id);
+      
+      if (userID) {
+        const allowed = participants.findIndex((id: number) => id === userID);
+        if (allowed === -1) throw new Error('User not allowed to see this conversation');
+      }
+
+      return participants;
+    } catch (error) {
+      console.error('Error getting participants:', error);
+      this.io.emit('error', error);
+    }
   }
 
   // Sockets to send the message
@@ -115,9 +179,10 @@ class WS {
 
   private static async onCall(data: any) {
     try {
-      const participants = await this.participants(data.conversation, data.user.id);
+      let participants = await this.conversation(data.conversation, data.toID);
       if (!participants) throw new Error('No participants found');
 
+      participants = participants.filter((id: number) => id === data.toID);
       const sockets = this.usersToSockets(participants);
 
       // Send call to the conversation
@@ -131,17 +196,18 @@ class WS {
     }
   }
 
-  private static async onCandidate(data: any) {
+  private static async onTriggerCandidate(data: RTCBase) {
     try {
-      const participants = await this.participants(data.conversation, data.user);
+      let participants = await this.conversation(data.conversation, data.receiver);
       if (!participants) throw new Error('No participants found');
 
+      participants = participants.filter((id: number) => id === data.receiver);
       const sockets = this.usersToSockets(participants);
 
       // Send candidate to the conversation
-      console.log('Sending candidate to:', sockets);
+      console.log('Sending trigger candidate to:', sockets);
       for (const id of sockets) {
-        this.io.to(id).emit('candidate', data);
+        this.io.to(id).emit('trigger-candidates', data);
       }
     } catch (error) {
       console.error('Error receiving call:', error);
@@ -149,11 +215,31 @@ class WS {
     }
   }
 
-  private static async onNegotiation(data: any) {
+  private static async onCandidate(data: RTCCandidate) {
     try {
-      const participants = await this.participants(data.conversation, data.user.id);
+      let participants = await this.conversation(data.conversation, data.receiver);
       if (!participants) throw new Error('No participants found');
 
+      participants = participants.filter((id: number) => id === data.receiver);
+      const sockets = this.usersToSockets(participants);
+
+      // Send candidate to the conversation
+      console.log('Sending candidate to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('candidates', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static async onNegotiation(data: RTCSignal) {
+    try {
+      let participants = await this.conversation(data.conversation, data.toID);
+      if (!participants) throw new Error('No participants found');
+
+      participants = participants.filter((id: number) => id === data.toID);
       const sockets = this.usersToSockets(participants);
 
       // Send candidate to the conversation
@@ -200,6 +286,25 @@ class WS {
     } catch (error) {
       console.error('Error receiving call:', error);
       this.io.emit('error', error);
+    }
+  }
+
+  private static async onConnected(data: RTCConnected) {
+    const conv = this.conversations.get(data.conversation);
+    if (!conv) return;
+
+    console.log('onConnected:', data);
+    console.log('Connected users:', conv);
+    
+    
+    let users = conv.filter((id: number) => id !== data.user);
+    users = users.filter((id: number) => !data.peers.includes(id));
+    console.log('Sending to:', users);
+
+    const sockets = this.usersToSockets([data.user]);
+    console.log('Sending to:', sockets);
+    for (const id of sockets) {
+      this.io.to(id).emit('connected', users);
     }
   }
 }
