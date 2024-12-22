@@ -24,6 +24,14 @@ class WS {
       console.log('A user connected:', socket.id);
       socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+        for (const [conversation, users] of this.conversations.entries()) {
+          const index = users.findIndex((id: number) => id === this.sockets.get(socket.id));
+          if (index !== -1) {
+            users.splice(index, 1);
+            this.conversations.set(conversation, users);
+          }
+          if (users.length === 0) this.conversations.delete(conversation);
+        }
         this.sockets.delete(socket.id);
       });
 
