@@ -234,11 +234,12 @@ class WS {
     }
   }
 
-  private static async onNegotiation(data: any) {
+  private static async onNegotiation(data: RTCSignal) {
     try {
-      const participants = await this.participants(data.conversation, data.user.id);
+      let participants = await this.conversation(data.conversation, data.toID);
       if (!participants) throw new Error('No participants found');
 
+      participants = participants.filter((id: number) => id === data.toID);
       const sockets = this.usersToSockets(participants);
 
       // Send candidate to the conversation
