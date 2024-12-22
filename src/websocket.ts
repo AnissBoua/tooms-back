@@ -7,6 +7,7 @@ import { Conversation } from "@/models/conversation";
 import { RTCSignal } from "@/types/RTCSignal";
 import { RTCCandidate } from "@/types/RTCCandidate";
 import { RTCSignalRequest } from "@/types/RTCSignalRequest";
+import { RTCConnected } from "./types/RTCConnected";
 
 const ConversationRepo = AppDataSource.getRepository(Conversation);
 
@@ -93,6 +94,9 @@ class WS {
           this.onSignal(data);
         })
 
+        socket.on('connected', async (data: RTCConnected) => {
+          this.onConnected(data);
+        })
       });
     });
   }
@@ -271,6 +275,25 @@ class WS {
     } catch (error) {
       console.error('Error receiving call:', error);
       this.io.emit('error', error);
+    }
+  }
+
+  private static async onConnected(data: RTCConnected) {
+    const conv = this.conversations.get(data.conversation);
+    if (!conv) return;
+
+    console.log('onConnected:', data);
+    console.log('Connected users:', conv);
+    
+    
+    let users = conv.filter((id: number) => id !== data.user);
+    users = users.filter((id: number) => !data.peers.includes(id));
+    console.log('Sending to:', users);
+
+    const sockets = this.usersToSockets([data.user]);
+    console.log('Sending to:', sockets);
+    for (const id of sockets) {
+      this.io.to(id).emit('connected', users);
     }
   }
 }
