@@ -87,7 +87,7 @@ class WS {
           this.onTriggerCandidate(data);
         })
 
-        socket.on('candidate', async (data: RTCCandidate) => {
+        socket.on('candidates', async (data: RTCCandidate) => {
           this.onCandidate(data);
         })
 
@@ -226,7 +226,7 @@ class WS {
       // Send candidate to the conversation
       console.log('Sending candidate to:', sockets);
       for (const id of sockets) {
-        this.io.to(id).emit('candidate', data);
+        this.io.to(id).emit('candidates', data);
       }
     } catch (error) {
       console.error('Error receiving call:', error);
