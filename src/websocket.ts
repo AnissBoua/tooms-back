@@ -201,11 +201,12 @@ class WS {
     }
   }
 
-  private static async onCandidate(data: any) {
+  private static async onCandidate(data: RTCCandidate) {
     try {
-      const participants = await this.participants(data.conversation, data.user);
+      let participants = await this.conversation(data.conversation, data.receiver);
       if (!participants) throw new Error('No participants found');
 
+      participants = participants.filter((id: number) => id === data.receiver);
       const sockets = this.usersToSockets(participants);
 
       // Send candidate to the conversation
