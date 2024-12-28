@@ -91,7 +91,7 @@ router.post("/login", [ZLogin()], async (req: Request, res: Response) => {
             return;
         }
     
-        const token = JWT.sign(user, 60 * 15);
+        const token = JWT.sign(user, 60 * 60);
         const refresh = new RefreshToken();
         refresh.token = JWT.sign(user, 60 * 60 * 24 * 7);
         refresh.jwtid = JWT.verify(token).jti;
@@ -148,7 +148,7 @@ router.post("/register", [ZRegister()], async (req: Request, res: Response) => {
         let user = repository.create(data);
         user = await repository.save(user);
 
-        const token = JWT.sign(user, 60 * 15);
+        const token = JWT.sign(user, 60 * 60);
         const refresh = new RefreshToken();
         refresh.token = JWT.sign(user, 60 * 60 * 24 * 7);
         refresh.jwtid = JWT.verify(token).jti;
@@ -189,7 +189,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
         refresh.used_at = new Date();
         await refreshRepository.update(refresh.id, { used_at: refresh.used_at });
         
-        const token = JWT.sign(refresh.user, 60 * 15);
+        const token = JWT.sign(refresh.user, 60 * 60);
         const updated = new RefreshToken();
         updated.token = JWT.sign(refresh.user, JWT.expires(new Date(refresh.expires_at)));
         updated.jwtid = JWT.verify(token).jti;
