@@ -72,6 +72,10 @@ class WS {
           this.onCall(data);
         });
 
+        socket.on('refuse', async (data: RTCSignal) => {
+          this.onRefuse(data);
+        });
+
         socket.on('multi-call', async (data: RTCSignal) => {
           const actives = this.conversations.get(data.conversation) || [];
           const sockets = this.usersToSockets([data.user.id]);
@@ -177,7 +181,7 @@ class WS {
     }
   }
 
-  private static async onCall(data: any) {
+  private static async onCall(data: RTCSignal) {
     try {
       let participants = await this.conversation(data.conversation, data.toID);
       if (!participants) throw new Error('No participants found');
@@ -189,6 +193,24 @@ class WS {
       console.log('Sending call to:', sockets);
       for (const id of sockets) {
         this.io.to(id).emit('call', data);
+      }
+    } catch (error) {
+      console.error('Error receiving call:', error);
+      this.io.emit('error', error);
+    }
+  }
+
+  private static async onRefuse(data: RTCSignal) {
+    try {
+      const participants = await this.participants(data.conversation, data.user.id);
+      if (!participants) throw new Error('No participants found');
+
+      const sockets = this.usersToSockets(participants);
+
+      // Send call to the conversation
+      console.log('Sending refuse to:', sockets);
+      for (const id of sockets) {
+        this.io.to(id).emit('refuse', data);
       }
     } catch (error) {
       console.error('Error receiving call:', error);
