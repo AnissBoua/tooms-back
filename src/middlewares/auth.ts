@@ -1,10 +1,10 @@
-import { NextFunction } from "express";
+import { NextFunction, Request } from "express";
 import { JWT } from "@/services/jwt";
 import { TokenBlacklist } from "@/models/tokenblacklist";
 import AppDataSource from "@/config/typeorm";
 
 const blacklistRepo = AppDataSource.getRepository(TokenBlacklist);
-const auth = async (req: any, res: any, next: NextFunction) => {
+const auth = async (req: Request, res: any, next: NextFunction) => {
     const token = req.header('Authorization');
     if (!token) {
         return res.status(401).json({ error: 'Unauthorized.' });
