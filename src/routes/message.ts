@@ -49,7 +49,7 @@ const ZUpdate = () => {
     }
 }
 
-router.post('/', [auth, ZCreate()], async (req: any, res: Response) => {
+router.post('/', [auth, ZCreate()], async (req: Request, res: Response) => {
     try {
         const conversation = await ConversationRepo.findOne({ where: { id: req.body.conversation }, relations: ['participants'] });
         if (!conversation) {
@@ -57,12 +57,12 @@ router.post('/', [auth, ZCreate()], async (req: any, res: Response) => {
             return;
         }
 
-        if (!conversation.participants.some((u: User) => u.id === req.user.sub)) {
+        if (!conversation.participants.some((u: User) => u.id === req.user?.sub)) {
             res.status(403).json({ error: 'You are not part of this conversation' });
             return;
         }
 
-        const data = { ...req.body, user: req.user.sub };
+        const data = { ...req.body, user: req.user?.sub };
         const message = await repository.save(data);
         res.json(message);
         // TODO: Send message to conversation with websockets
@@ -71,9 +71,14 @@ router.post('/', [auth, ZCreate()], async (req: any, res: Response) => {
     }
 });
 
-router.put('/:id', [auth, ZUpdate()], async (req: any, res: Response) => {
+router.put('/:id', [auth, ZUpdate()], async (req: Request, res: Response) => {
     try {
-        let message = await repository.findOne({ where: { id: req.params.id }, relations: ['user'] });
+        if (!req.user) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        let message = await repository.findOne({ where: { id: Number(req.params.id) }, relations: ['user'] });
         if (!message) {
             res.status(404).json({ error: 'Message not found' });
             return;
@@ -93,9 +98,14 @@ router.put('/:id', [auth, ZUpdate()], async (req: any, res: Response) => {
     }
 });
 
-router.delete('/:id', [auth], async (req: any, res: Response) => {
+router.delete('/:id', [auth], async (req: Request, res: Response) => {
     try {
-        let message = await repository.findOne({ where: { id: req.params.id }, relations: ['user'] });
+        if (!req.user) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        let message = await repository.findOne({ where: { id: Number(req.params.id) }, relations: ['user'] });
         if (!message) {
             res.status(404).json({ error: 'Message not found' });
             return;

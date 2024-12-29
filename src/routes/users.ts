@@ -82,7 +82,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 });
 
-router.get('/search', [auth], async (req: any, res: Response) => {
+router.get('/search', [auth], async (req: Request, res: Response) => {
     try {
         if (!req.query.search || req.query.search === '') {
             res.json([]);
@@ -97,7 +97,7 @@ router.get('/search', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        users = users.filter((user) => user.id !== req.user.sub);
+        users = users.filter((user) => user.id !== req.user?.sub);
 
         res.json(users);
     } catch (error) {
@@ -143,8 +143,13 @@ router.post('/', ZCreate(), async (req: Request, res: Response) => {
     }
 });
 
-router.put('/:id', [auth, ZID(), ZUpdate()], async (req: any, res: Response) => {
+router.put('/:id', [auth, ZID(), ZUpdate()], async (req: Request, res: Response) => {
     try {
+        if (!req.user) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
             res.status(404).json({ error: 'User not found' });
@@ -171,8 +176,13 @@ router.put('/:id', [auth, ZID(), ZUpdate()], async (req: any, res: Response) => 
     }
 });
 
-router.delete('/:id', [auth, ZID()], async (req: any, res: Response) => {
+router.delete('/:id', [auth, ZID()], async (req: Request, res: Response) => {
     try {
+        if (!req.user) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+        
         const user = await repository.findOneBy({ id: parseInt(req.params.id) });
         if (!user) {
             res.status(404).json({ error: 'User not found' });

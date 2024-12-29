@@ -51,8 +51,13 @@ const ZValidate = () => {
     }
 }
 
-router.get('/', [auth], async (req: any, res: Response) => {
+router.get('/', [auth], async (req: Request, res: Response) => {
     try {
+        if (!req.user) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
         const user = await UserRepo.findOne({ where: {id: req.user.sub}, relations: { conversations: { participants: true } } });
         if (!user) {
             res.status(404).json({ error: 'User not found' });
@@ -71,7 +76,7 @@ router.get('/', [auth], async (req: any, res: Response) => {
     }
 });
 
-router.get('/:id', [auth], async (req: any, res: Response) => {
+router.get('/:id', [auth], async (req: Request, res: Response) => {
     try {
         const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: { participants: true } });
         if (!conversation) {
@@ -79,7 +84,7 @@ router.get('/:id', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user?.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to see this conversation' });
             return;
@@ -97,7 +102,7 @@ router.get('/:id', [auth], async (req: any, res: Response) => {
     }
 });
 
-router.get('/:id/messages', [auth], async (req: any, res: Response) => {
+router.get('/:id/messages', [auth], async (req: Request, res: Response) => {
     try {
         const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: { participants: true } });
         if (!conversation) {
@@ -105,7 +110,7 @@ router.get('/:id/messages', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user?.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to see this conversation' });
             return;
@@ -125,8 +130,13 @@ router.get('/:id/messages', [auth], async (req: any, res: Response) => {
     }
 });
 
-router.post('/', [auth, ZCreate()], async (req: any, res: Response) => {
+router.post('/', [auth, ZCreate()], async (req: Request, res: Response) => {
     try {
+        if (!req.user) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
         if (!req.body.users.includes(req.user.sub)) req.body.users.push(req.user.sub); // Add the user to the conversation
         
         const users = await UserRepo.findBy({ id: In(req.body.users) });
@@ -145,7 +155,7 @@ router.post('/', [auth, ZCreate()], async (req: any, res: Response) => {
     }
 });
 
-router.put('/:id/add', [auth, ZValidate()], async (req: any, res: Response) => {
+router.put('/:id/add', [auth, ZValidate()], async (req: Request, res: Response) => {
     try {
         const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: ['participants'] });
         if (!conversation) {
@@ -153,7 +163,7 @@ router.put('/:id/add', [auth, ZValidate()], async (req: any, res: Response) => {
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user?.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to delete this conversation' });
             return;
@@ -175,7 +185,7 @@ router.put('/:id/add', [auth, ZValidate()], async (req: any, res: Response) => {
     }
 });
 
-router.put('/:id/remove', [auth, ZValidate()], async (req: any, res: Response) => {
+router.put('/:id/remove', [auth, ZValidate()], async (req: Request, res: Response) => {
     try {
         const conversation = await repository.findOne({ where: {id: parseInt(req.params.id)}, relations: ['participants'] });
         if (!conversation) {
@@ -183,7 +193,7 @@ router.put('/:id/remove', [auth, ZValidate()], async (req: any, res: Response) =
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user?.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to delete this conversation' });
             return;
@@ -206,7 +216,7 @@ router.put('/:id/remove', [auth, ZValidate()], async (req: any, res: Response) =
     }
 });
 
-router.delete('/:id', [auth], async (req: any, res: Response) => {
+router.delete('/:id', [auth], async (req: Request, res: Response) => {
     try {
         const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: ['participants'] });
         if (!conversation) {
@@ -214,7 +224,7 @@ router.delete('/:id', [auth], async (req: any, res: Response) => {
             return;
         }
 
-        const exist = conversation.participants.findIndex((user: User) => user.id === req.user.sub);
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user?.sub);
         if (exist === -1) {
             res.status(403).json({ error: 'You are not allowed to delete this conversation' });
             return;
