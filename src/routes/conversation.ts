@@ -64,9 +64,18 @@ router.get('/', [auth], async (req: Request, res: Response) => {
             return;
         }
 
-        const data = user.conversations.map(conversation => ({
-            ...conversation,
-            messages: [], // Add empty messages array
+        const data = await Promise.all(user.conversations.map(async conversation => {
+            const lastMessage = await MessageRepo.findOne({
+                where: { conversation: { id: conversation.id } },
+                relations: { user: true },
+                order: { id: 'DESC' },
+            });
+
+            return {
+                ...conversation,
+                messages: [], // Add empty messages array
+                lastMessage: lastMessage ?? null,
+            };
         }));
 
         res.json(data);
