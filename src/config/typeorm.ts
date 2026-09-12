@@ -5,7 +5,12 @@ import { DataSource } from 'typeorm';
 const env = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
 dotenv.config({ path: env });
 
-const production = process.env.NODE_ENV === 'production';
+// Based on how this file itself is being executed (compiled dist/*.js vs run
+// directly from src/*.ts via ts-node), not NODE_ENV - a script like seed:demo
+// always runs against src/ via ts-node even when NODE_ENV=production, and
+// mixing the two loads the same entity as two different classes, which makes
+// TypeORM unable to find metadata for repositories built from the other one.
+const compiled = __filename.endsWith('.js');
 
 const AppDataSource = new DataSource({
   type: 'mysql',
@@ -16,8 +21,8 @@ const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'tooms',
   synchronize: false,
   logging: false,
-  entities: production ? ['dist/src/models/*{.ts,.js}'] : ['src/models/*{.ts,.js}'],
-  migrations: production ? ['dist/src/migrations/*{.ts,.js}'] : ['src/migrations/*{.ts,.js}'],
+  entities: compiled ? ['dist/src/models/*.js'] : ['src/models/*.ts'],
+  migrations: compiled ? ['dist/src/migrations/*.js'] : ['src/migrations/*.ts'],
 });
 
 export default AppDataSource;
