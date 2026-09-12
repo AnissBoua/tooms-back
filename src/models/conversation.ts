@@ -10,6 +10,9 @@ export class Conversation {
     @Column({ nullable: true })
     name: string;
 
+    @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+    created_at: Date;
+
     @ManyToMany(() => User, user => user.conversations)
     @JoinTable()
     participants: User[];

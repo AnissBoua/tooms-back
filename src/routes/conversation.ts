@@ -4,13 +4,34 @@ import { z } from "zod";
 import { Conversation } from "@/models/conversation";
 import { auth } from "@/middlewares/auth";
 import { User } from "@/models/user";
-import { In } from "typeorm";
+import { In, MoreThan, Not } from "typeorm";
 import { Message } from "@/models/message";
+import { ReadReceipt } from "@/models/readreceipt";
+import { Call } from "@/models/call";
+import WS from "@/websocket";
 
 const router: Router = Router();
 const repository = AppDataSource.getRepository(Conversation);
 const UserRepo = AppDataSource.getRepository(User);
 const MessageRepo = AppDataSource.getRepository(Message);
+const ReadReceiptRepo = AppDataSource.getRepository(ReadReceipt);
+const CallRepo = AppDataSource.getRepository(Call);
+
+const readReceipts = async (conversationId: number) => {
+    const receipts = await ReadReceiptRepo.find({ where: { conversation: { id: conversationId } }, relations: { user: true } });
+    return receipts.map(r => ({ user: r.user.id, last_read_at: r.last_read_at }));
+}
+
+const unreadCount = async (conversationId: number, userId: number) => {
+    const mine = await ReadReceiptRepo.findOne({ where: { user: { id: userId }, conversation: { id: conversationId } } });
+    return MessageRepo.count({
+        where: {
+            conversation: { id: conversationId },
+            user: { id: Not(userId) },
+            ...(mine ? { created_at: MoreThan(mine.last_read_at) } : {}),
+        },
+    });
+}
 
 const ZCreate = () => {
     return (req: Request, res: Response, next: any) => {
@@ -75,6 +96,8 @@ router.get('/', [auth], async (req: Request, res: Response) => {
                 ...conversation,
                 messages: [], // Add empty messages array
                 lastMessage: lastMessage ?? null,
+                unread: await unreadCount(conversation.id, req.user!.sub),
+                readReceipts: await readReceipts(conversation.id),
             };
         }));
 
@@ -99,12 +122,51 @@ router.get('/:id', [auth], async (req: Request, res: Response) => {
             return;
         }
 
+        const messageCount = await MessageRepo.count({ where: { conversation: { id: conversation.id } } });
+        const calls = await CallRepo.find({ where: { conversation: { id: conversation.id } }, relations: { initiator: true }, order: { started_at: 'ASC' } });
+
         const data = {
             ...conversation,
             messages: [], // Add empty messages array
+            messageCount,
+            unread: await unreadCount(conversation.id, req.user!.sub),
+            readReceipts: await readReceipts(conversation.id),
+            calls,
+            callCount: calls.length,
         };
 
         res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error });
+    }
+});
+
+router.put('/:id/read', [auth], async (req: Request, res: Response) => {
+    try {
+        const conversation = await repository.findOne({ where: { id: parseInt(req.params.id) }, relations: { participants: true } });
+        if (!conversation) {
+            res.status(404).json({ error: 'Conversation not found' });
+            return;
+        }
+
+        const exist = conversation.participants.findIndex((user: User) => user.id === req.user?.sub);
+        if (exist === -1) {
+            res.status(403).json({ error: 'You are not allowed to see this conversation' });
+            return;
+        }
+
+        const now = new Date();
+        const existing = await ReadReceiptRepo.findOne({ where: { user: { id: req.user!.sub }, conversation: { id: conversation.id } } });
+        if (existing) {
+            await ReadReceiptRepo.update(existing.id, { last_read_at: now });
+        } else {
+            await ReadReceiptRepo.save({ user: { id: req.user!.sub }, conversation: { id: conversation.id }, last_read_at: now });
+        }
+
+        WS.broadcastRead(conversation.id, req.user!.sub, now);
+
+        res.json({ last_read_at: now });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error });
