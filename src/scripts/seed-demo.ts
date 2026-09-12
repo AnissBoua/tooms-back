@@ -8,9 +8,7 @@ const ACCOUNTS = [
     { name: "Ben", lastname: "Kowalski", email: "ben.demo@tooms.app", password: "tooms-demo-2" },
 ];
 
-async function seed() {
-    await AppDataSource.initialize();
-
+export async function seedDemo() {
     const userRepo = AppDataSource.getRepository(User);
     const conversationRepo = AppDataSource.getRepository(Conversation);
 
@@ -57,11 +55,16 @@ async function seed() {
     } else {
         console.log("Demo conversation already exists");
     }
-
-    await AppDataSource.destroy();
 }
 
-seed().catch((error) => {
-    console.error(error);
-    process.exit(1);
-});
+// Only run as a standalone script (`npm run seed:demo`); the demo-reset cron
+// imports seedDemo() directly and reuses the already-initialized connection.
+if (require.main === module) {
+    AppDataSource.initialize()
+        .then(seedDemo)
+        .then(() => AppDataSource.destroy())
+        .catch((error) => {
+            console.error(error);
+            process.exit(1);
+        });
+}

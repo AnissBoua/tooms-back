@@ -16,9 +16,9 @@ export class Message {
     @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
     updated_at: Date;
 
-    @ManyToOne(() => User, user => user.id)
+    @ManyToOne(() => User, user => user.id, { onDelete: 'CASCADE' })
     user: User;
 
-    @ManyToOne(() => Conversation, conversation => conversation.id)
+    @ManyToOne(() => Conversation, conversation => conversation.id, { onDelete: 'CASCADE' })
     conversation: Conversation;
 }

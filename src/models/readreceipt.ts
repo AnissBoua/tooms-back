@@ -8,10 +8,10 @@ export class ReadReceipt {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => User)
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
     user: User;
 
-    @ManyToOne(() => Conversation)
+    @ManyToOne(() => Conversation, { onDelete: 'CASCADE' })
     conversation: Conversation;
 
     @Column({ type: 'datetime' })

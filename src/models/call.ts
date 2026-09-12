@@ -7,10 +7,10 @@ export class Call {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => Conversation)
+    @ManyToOne(() => Conversation, { onDelete: 'CASCADE' })
     conversation: Conversation;
 
-    @ManyToOne(() => User)
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
     initiator: User;
 
     @Column({ type: 'enum', enum: ['audio', 'video'] })

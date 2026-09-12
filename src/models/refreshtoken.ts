@@ -12,7 +12,7 @@ export class RefreshToken {
     @Column({ comment: 'Access Token JWT ID' })
     jwtid: string;
 
-    @ManyToOne(() => User, user => user.id)
+    @ManyToOne(() => User, user => user.id, { onDelete: 'CASCADE' })
     user: User;
 
     @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
